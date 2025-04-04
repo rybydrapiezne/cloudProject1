@@ -1,0 +1,13 @@
+{
+    "AWSEBDockerrunVersion": "1",
+    "Image": {
+        "Name": "szymik43/chatappfrontend:latest",
+        "Update": "true"
+    },
+    "Ports": [
+        {
+            "hostPort": 5173,
+            "containerPort": 5173
+        }
+    ]
+}
