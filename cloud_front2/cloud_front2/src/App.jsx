@@ -21,6 +21,10 @@ function App() {
     window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
   };
 
+
+  if (auth.error) {
+    return <div>Encountering error... {auth.error.message}</div>;
+  }
   useEffect(() => {
     if (auth.isAuthenticated) {
       fetchMessages();

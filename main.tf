@@ -29,45 +29,39 @@ resource "aws_db_instance" "chatappdb" {
 resource "aws_cognito_user_pool" "chatapp_user_pool" {
   name = "chatapp-user-pool"
 
-  alias_attributes         = ["email"]
+    username_configuration {
+    case_sensitive = false
+  }
+
+  #username_attributes = ["email"]
   auto_verified_attributes = ["email"]
 
-  # Add email configuration to enable verification codes
-  email_configuration {
-    email_sending_account = "COGNITO_DEFAULT"
+    admin_create_user_config {
+    allow_admin_create_user_only = false
   }
-}
 
-resource "aws_cognito_user_pool_domain" "chatapp_domain" {
-  domain       = "chatapp-auth"
-  user_pool_id = aws_cognito_user_pool.chatapp_user_pool.id
+  schema {
+    attribute_data_type = "String"
+    name               = "email"
+    required           = true
+    string_attribute_constraints {
+      min_length = 5
+      max_length = 50
+    }
+  }
 }
 
 resource "aws_cognito_user_pool_client" "chatapp_client" {
   name         = "chatapp-client"
   user_pool_id = aws_cognito_user_pool.chatapp_user_pool.id
-
+  generate_secret = false
   explicit_auth_flows = [
-    "ALLOW_ADMIN_USER_PASSWORD_AUTH",
     "ALLOW_USER_PASSWORD_AUTH",
-    "ALLOW_REFRESH_TOKEN_AUTH"
+    "ALLOW_REFRESH_TOKEN_AUTH",
+    "ALLOW_USER_SRP_AUTH"
   ]
-
-  generate_secret                      = false
-  allowed_oauth_flows                  = ["code"]
-  allowed_oauth_scopes                 = ["openid", "email", "phone"]
-  allowed_oauth_flows_user_pool_client = true
-
-  callback_urls = ["https://temp"]
-  logout_urls   = ["https://temp"]
-
-  supported_identity_providers = ["COGNITO"]
 }
 
-output "cognito_login_url" {
-  value       = "https://${aws_cognito_user_pool_domain.chatapp_domain.domain}.auth.us-east-1.amazoncognito.com/login?client_id=${aws_cognito_user_pool_client.chatapp_client.id}&response_type=code&scope=openid+email+profile&redirect_uri=https://chatappfrontend-env.eba-2uumvdjt.us-east-1.elasticbeanstalk.com/oauth2/idpresponse"
-  description = "Managed Cognito login page URL"
-}
 # S3 Bucket for Profile Pictures
 resource "aws_s3_bucket" "profile_pictures" {
   bucket = "profilepicchatappbucket"
@@ -209,4 +203,7 @@ resource "aws_elastic_beanstalk_environment" "backend" {
     value     = aws_s3_bucket.profile_pictures.bucket
   }
 
+}
+resource "aws_cloudwatch_log_group" "chatapp_logs" {
+  name = "ChatAppLogs"
 }
