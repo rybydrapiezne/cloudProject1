@@ -11,7 +11,6 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# PostgreSQL Database
 resource "aws_db_instance" "chatappdb" {
   allocated_storage    = 20
   engine               = "postgres"
@@ -33,7 +32,6 @@ resource "aws_cognito_user_pool" "chatapp_user_pool" {
     case_sensitive = false
   }
 
-  #username_attributes = ["email"]
   auto_verified_attributes = ["email"]
 
     admin_create_user_config {
@@ -55,6 +53,18 @@ resource "aws_cognito_user_pool_client" "chatapp_client" {
   name         = "chatapp-client"
   user_pool_id = aws_cognito_user_pool.chatapp_user_pool.id
   generate_secret = false
+
+  allowed_oauth_flows = ["code"]
+
+  allowed_oauth_scopes = ["openid", "email", "phone"]
+
+  supported_identity_providers = ["COGNITO"]
+
+  allowed_oauth_flows_user_pool_client = true
+
+  callback_urls = ["https://frontend-domain"]
+  logout_urls   = ["https://frontend-domain"]
+
   explicit_auth_flows = [
     "ALLOW_USER_PASSWORD_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
@@ -62,17 +72,14 @@ resource "aws_cognito_user_pool_client" "chatapp_client" {
   ]
 }
 
-# S3 Bucket for Profile Pictures
 resource "aws_s3_bucket" "profile_pictures" {
   bucket = "profilepicchatappbucket"
 
-  # Prevent accidental deletion of the bucket
   lifecycle {
-    prevent_destroy = false # Set to true in production
+    prevent_destroy = false 
   }
 }
 
-# Optional: S3 Bucket Public Access Block (recommended for security)
 resource "aws_s3_bucket_public_access_block" "profile_pictures" {
   bucket = aws_s3_bucket.profile_pictures.id
 
@@ -81,7 +88,6 @@ resource "aws_s3_bucket_public_access_block" "profile_pictures" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
-# Frontend Application (with required IAM role)
 resource "aws_elastic_beanstalk_application" "frontend" {
   name = "chatappfrontend"
 }
@@ -109,13 +115,13 @@ resource "aws_elastic_beanstalk_environment" "frontend" {
   setting {
     namespace = "aws:elasticbeanstalk:environment"
     name      = "EnvironmentType"
-    value     = "LoadBalanced" # <-- This enables ALB
+    value     = "LoadBalanced"
   }
 
   setting {
     namespace = "aws:elasticbeanstalk:environment"
     name      = "LoadBalancerType"
-    value     = "application" # <-- Explicitly set to ALB
+    value     = "application" 
   }
   setting {
     namespace = "aws:elasticbeanstalk:application:environment"
@@ -155,7 +161,6 @@ resource "aws_elastic_beanstalk_environment" "frontend" {
 
 }
 
-# Backend Application (same fixes)
 resource "aws_elastic_beanstalk_application" "backend" {
   name = "chatappbackend"
 }
@@ -183,13 +188,13 @@ resource "aws_elastic_beanstalk_environment" "backend" {
   setting {
     namespace = "aws:elasticbeanstalk:environment"
     name      = "EnvironmentType"
-    value     = "LoadBalanced" # <-- This enables ALB
+    value     = "LoadBalanced"
   }
 
   setting {
     namespace = "aws:elasticbeanstalk:environment"
     name      = "LoadBalancerType"
-    value     = "application" # <-- Explicitly set to ALB
+    value     = "application" 
   }
   setting {
     namespace = "aws:elasticbeanstalk:application:environment"
@@ -202,7 +207,12 @@ resource "aws_elastic_beanstalk_environment" "backend" {
     name      = "bucket_name"
     value     = aws_s3_bucket.profile_pictures.bucket
   }
+  
 
+}
+resource "aws_cognito_user_pool_domain" "chatapp_domain" {
+  domain       = "chatapp-auth-domain"
+  user_pool_id = aws_cognito_user_pool.chatapp_user_pool.id
 }
 resource "aws_cloudwatch_log_group" "chatapp_logs" {
   name = "ChatAppLogs"

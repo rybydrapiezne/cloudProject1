@@ -26,11 +26,24 @@ function App() {
     return <div>Encountering error... {auth.error.message}</div>;
   }
   useEffect(() => {
+    let interval;
+  
+    const startFetching = async () => {
+      await fetchMessages(); 
+  
+      interval = setInterval(() => {
+        fetchMessages(); 
+      }, 3000); 
+    };
+  
     if (auth.isAuthenticated) {
-      fetchMessages();
+      startFetching();
     }
+  
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [auth.isAuthenticated]);
-
   useEffect(() => {
     if (auth.isAuthenticated && messages.length > 0) {
       loadProfilePictures();

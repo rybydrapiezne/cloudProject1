@@ -26,4 +26,25 @@ class ProfileController @Autowired constructor(
     fun getProfilePicture(@PathVariable username: String): ResponseEntity<Any> {
         return chatService.getProfilePicture(username)
     }
+    @PostMapping("/{username}/status")
+    fun updateUserStatus(
+            @PathVariable username: String,
+            @RequestBody statusRequest: Map<String, String>
+    ): ResponseEntity<String> {
+        val status = statusRequest["status"] ?: throw IllegalArgumentException("Status is required")
+        chatService.updateUserStatus(username, status)
+        return ResponseEntity.ok("Status updated")
+    }
+
+    @GetMapping("/{username}/status")
+    fun getUserStatus(@PathVariable username: String): ResponseEntity<String> {
+        val status = chatService.getUserStatus(username)
+        return ResponseEntity.ok(status)
+    }
+
+    @GetMapping("/online-users")
+    fun getOnlineUsers(): ResponseEntity<List<String>> {
+        val onlineUsers = chatService.getOnlineUsers()
+        return ResponseEntity.ok(onlineUsers)
+    }
 }

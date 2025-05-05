@@ -12,7 +12,7 @@ export const getApi = () => {
                         username: username,
                     },
                     headers: {
-                        'Content-Type': 'application/json', // Explicitly set JSON header
+                        'Content-Type': 'application/json',
                     },
                 });
                 console.log(response)
@@ -30,7 +30,7 @@ export const getApi = () => {
                 };
                 const response = await axios.post(`${API_BASE_URL}/chat`, newMessage, {
                     headers: {
-                        'Content-Type': 'application/json', // Explicitly set JSON header
+                        'Content-Type': 'application/json',
                     },
                 });
                 return response.data;

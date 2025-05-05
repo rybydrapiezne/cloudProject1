@@ -13,7 +13,7 @@ class S3Config {
     @Bean
     fun s3Client(): S3Client {
         return S3Client.builder()
-            .region(Region.US_EAST_1) // Replace with your region
+            .region(Region.US_EAST_1)
             .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
             .build()
     }

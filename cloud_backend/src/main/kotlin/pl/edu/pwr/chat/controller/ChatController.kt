@@ -37,4 +37,32 @@ class ChatController @Autowired constructor(
 
         return ResponseEntity.ok().build()
     }
+    @PostMapping("/{messageId}/reactions")
+    fun addReaction(
+            @PathVariable messageId: String,
+            @RequestBody reactionRequest: Map<String, String>
+    ): ResponseEntity<String> {
+        val username = reactionRequest["username"] ?: throw IllegalArgumentException("Username is required")
+        val reaction = reactionRequest["reaction"] ?: throw IllegalArgumentException("Reaction is required")
+        chatService.addReaction(messageId, username, reaction)
+        return ResponseEntity.ok("Reaction added")
+    }
+
+    @DeleteMapping("/{messageId}/reactions")
+    fun removeReaction(
+            @PathVariable messageId: String,
+            @RequestBody reactionRequest: Map<String, String>
+    ): ResponseEntity<String> {
+        val username = reactionRequest["username"] ?: throw IllegalArgumentException("Username is required")
+        val reaction = reactionRequest["reaction"] ?: throw IllegalArgumentException("Reaction is required")
+        chatService.removeReaction(messageId, username, reaction)
+        return ResponseEntity.ok("Reaction removed")
+    }
+
+    @GetMapping("/{messageId}/reactions")
+    fun getMessageReactions(@PathVariable messageId: String): ResponseEntity<Map<String, Any>> {
+        val reactions = chatService.getMessageReactions(messageId)
+        return ResponseEntity.ok(reactions)
+    }
 }
+

@@ -23,25 +23,30 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import java.io.InputStream
 import java.time.LocalDateTime
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class ChatServiceImpl @Autowired constructor(
 
-    private val chatMessageRepository: ChatMessageRepository,
-    private val userProfileRepository: UserProfileRepository,
-    private val s3Client: S3Client
+        private val chatMessageRepository: ChatMessageRepository,
+        private val userProfileRepository: UserProfileRepository,
+        private val s3Client: S3Client,
+
 
 
 ) : ChatService {
-    private val bucketName = System.getenv("bucket_name");
+    private val userStatuses = ConcurrentHashMap<String, String>()
 
+    private val messageReactions = ConcurrentHashMap<String, MutableMap<String, MutableSet<String>>>()
+    private val bucketName = System.getenv("bucket_name")
     override fun getAllEvents(username: String): MessagesListTO {
         val messages = chatMessageRepository.findAll()
         val messageList = messages.map { msg ->
             MessageTO(
-                username = msg.username,
-                message = msg.message,
-                timestamp = msg.timestamp
+                    id = msg.id,
+                    username = msg.username,
+                    message = msg.message,
+                    timestamp = msg.timestamp
             )
         }
         return MessagesListTO(messages = messageList)
@@ -51,9 +56,10 @@ class ChatServiceImpl @Autowired constructor(
         val messages = chatMessageRepository.findByTimestampAfter(after)
         val messageList = messages.map { msg ->
             MessageTO(
-                username = msg.username,
-                message = msg.message,
-                timestamp = msg.timestamp
+                    id = msg.id,
+                    username = msg.username,
+                    message = msg.message,
+                    timestamp = msg.timestamp
             )
         }
         return MessagesListTO(messages = messageList)
@@ -71,13 +77,11 @@ class ChatServiceImpl @Autowired constructor(
 
     fun getProfilePicture(username: String): ResponseEntity<Any> {
         return try {
-            // Build the list objects request properly
             val listRequest = ListObjectsV2Request.builder()
                 .bucket(bucketName)
                 .prefix("profile-pictures/$username-")
                 .build()
 
-            // Get all matching objects
             val listResponse = s3Client.listObjectsV2(listRequest)
             val userFiles = listResponse.contents()
 
@@ -86,8 +90,7 @@ class ChatServiceImpl @Autowired constructor(
                     .body("No profile pictures found for $username")
             }
 
-            // Get the most recently modified file
-            val latestFile = userFiles.maxByOrNull { it.lastModified() }!!
+                val latestFile = userFiles.maxByOrNull { it.lastModified() }!!
             val getRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(latestFile.key())
@@ -104,7 +107,6 @@ class ChatServiceImpl @Autowired constructor(
     }
 
     fun uploadProfilePicture(username: String, fileContent: ByteArray): String {
-        // Delete existing versions
         val listRequest = ListObjectsV2Request.builder()
             .bucket(bucketName)
             .prefix("profile-pictures/$username-")
@@ -114,7 +116,6 @@ class ChatServiceImpl @Autowired constructor(
             s3Client.deleteObject { it.bucket(bucketName).key(file.key()) }
         }
 
-        // Upload new version
         val key = "profile-pictures/$username-${UUID.randomUUID()}.jpg"
         s3Client.putObject(
             PutObjectRequest.builder()
@@ -127,6 +128,35 @@ class ChatServiceImpl @Autowired constructor(
 
         return "https://$bucketName.s3.amazonaws.com/$key"
     }
+    override fun updateUserStatus(username: String, status: String) {
+        userStatuses[username] = status
+    }
 
+    override fun getUserStatus(username: String): String {
+        return userStatuses[username] ?: "offline"
+    }
+
+    override fun getOnlineUsers(): List<String> {
+        return userStatuses.filter { it.value == "online" }.keys.toList()
+    }
+
+    override fun addReaction(messageId: String, username: String, reaction: String) {
+        val reactions = messageReactions.getOrPut(messageId) { ConcurrentHashMap() }
+        val users = reactions.getOrPut(reaction) { ConcurrentHashMap.newKeySet() }
+        users.add(username)
+    }
+
+    override fun removeReaction(messageId: String, username: String, reaction: String) {
+        messageReactions[messageId]?.get(reaction)?.remove(username)
+    }
+
+    override fun getMessageReactions(messageId: String): Map<String, Any> {
+        return messageReactions[messageId]?.mapValues {
+            mapOf(
+                    "count" to it.value.size,
+                    "users" to it.value.toList()
+            )
+        } ?: emptyMap()
+    }
 
 }

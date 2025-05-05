@@ -12,4 +12,10 @@ interface ChatService {
 
     fun createLiveEvent(messageDTO: MessageRequestTO)
 
+    fun updateUserStatus(username: String, status: String)
+    fun getUserStatus(username: String): String
+    fun getOnlineUsers(): List<String>
+    fun addReaction(messageId: String, username: String, reaction: String)
+    fun removeReaction(messageId: String, username: String, reaction: String)
+    fun getMessageReactions(messageId: String): Map<String, Any>
 }
