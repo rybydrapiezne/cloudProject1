@@ -24,19 +24,6 @@ resource "aws_db_instance" "chatappdb" {
   db_name              = "chatappdb"
   parameter_group_name = "default.postgres17"
 }
-resource "aws_db_instance" "notificationdb" {
-  allocated_storage    = 20
-  engine               = "postgres"
-  engine_version       = "17.2"
-  instance_class       = "db.t3.micro"
-  identifier           = "notificationdb"
-  username             = "postgres"
-  password             = "postgres"
-  publicly_accessible  = true
-  skip_final_snapshot  = true
-  db_name              = "notificationdb"
-  parameter_group_name = "default.postgres17"
-}
 
 
 resource "aws_cognito_user_pool" "chatapp_user_pool" {
@@ -193,11 +180,7 @@ locals {
   }
 }
 
-# ----------------------------- #
-# Task Definitions (4 Services)
-# ----------------------------- #
 
-# Chat Service
 resource "aws_ecs_task_definition" "chat_service" {
   family                   = "${local.container_defaults.family_prefix}-chat"
   network_mode             = local.container_defaults.network_mode
@@ -223,7 +206,6 @@ resource "aws_ecs_task_definition" "chat_service" {
   }])
 }
 
-# Notification Service
 resource "aws_ecs_task_definition" "notification_service" {
   family                   = "${local.container_defaults.family_prefix}-notification"
   network_mode             = local.container_defaults.network_mode
@@ -249,7 +231,6 @@ resource "aws_ecs_task_definition" "notification_service" {
   }])
 }
 
-# Profile Service
 resource "aws_ecs_task_definition" "profile_service" {
   family                   = "${local.container_defaults.family_prefix}-profile"
   network_mode             = local.container_defaults.network_mode
@@ -278,7 +259,6 @@ resource "aws_ecs_task_definition" "profile_service" {
   }])
 }
 
-# Auth Service
 resource "aws_ecs_task_definition" "auth_service" {
   family                   = "${local.container_defaults.family_prefix}-auth"
   network_mode             = local.container_defaults.network_mode
@@ -293,7 +273,7 @@ resource "aws_ecs_task_definition" "auth_service" {
     essential = true
     portMappings = [{ containerPort = 80 }]
     environment = [
-      { name = "auth_service",        value = "http://auth:80" },
+      { name = "auth_service",        value = "http://127.0.0.1" },
       { name = "chat_service",        value = "http://chat:80" },
       { name = "notification_service", value = "http://notification:80" },
       { name = "profile_service",     value = "http://profile:80" },
@@ -304,10 +284,6 @@ resource "aws_ecs_task_definition" "auth_service" {
   }])
 }
 
-# --------------------- #
-# ECS Services (4x)
-# --------------------- #
-
 resource "aws_ecs_service" "chat" {
   name            = "chat-service"
   cluster         = aws_ecs_cluster.chatapp_cluster.id
@@ -317,7 +293,7 @@ resource "aws_ecs_service" "chat" {
 
   network_configuration {
     subnets         = ["subnet-0605448cbd489a978", "subnet-0250ff5f1a54530df", "subnet-0606351734696e81f", "subnet-05aa3062a1853a3ae", "subnet-0663e117618197254", "subnet-03129c5dce6f4cf3e"] # Update to your subnet IDs
-    security_groups = ["sg-0cd9f3212a4aee613"]                        # Update to your security group ID
+    security_groups = ["sg-0cd9f3212a4aee613"]                        
     assign_public_ip = true
   }
 }
@@ -381,9 +357,7 @@ resource "aws_dynamodb_table" "notifications" {
   }
 }
 
-# ---------------------------- #
-# Auto Scaling Config for ECS
-# ---------------------------- #
+
 resource "aws_appautoscaling_target" "ecs_target_auth" {
   max_capacity       = 10
   min_capacity       = 2
@@ -480,7 +454,4 @@ resource "aws_appautoscaling_policy" "scale_out_notification" {
     scale_out_cooldown = 60
   }
 }
-
-# (Repeat for other services – chat, profile, notification)
-# TIP: Use for_each for less repetition if preferred
 
