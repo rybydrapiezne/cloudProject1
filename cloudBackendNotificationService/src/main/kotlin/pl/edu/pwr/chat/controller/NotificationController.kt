@@ -9,16 +9,16 @@ import pl.edu.pwr.chat.service.NotificationService
 
 @RestController
 @RequestMapping("/notifications")
-class NotificationController(
+class   NotificationController(
     private val notificationService: NotificationService
 ) {
     @PostMapping("/email")
     fun sendEmailNotification(@RequestBody request: NotificationRequest) {
-        notificationService.sendEmailNotification(request.target, request.message)
+        notificationService.sendEmailNotification(request._target, request._message)
     }
 
     @PostMapping("/sms")
     fun sendSmsNotification(@RequestBody request: NotificationRequest) {
-        notificationService.sendSmsNotification(request.target, request.message)
+        notificationService.sendSmsNotification(request._target, request._message)
     }
 }

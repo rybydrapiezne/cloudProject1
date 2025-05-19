@@ -1,4 +1,4 @@
-package pl.edu.pwr.chat
+	package pl.edu.pwr.chat
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

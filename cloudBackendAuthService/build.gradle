@@ -2,7 +2,7 @@ plugins {
 	id 'org.jetbrains.kotlin.jvm' version '1.9.25'
 	id 'org.jetbrains.kotlin.plugin.spring' version '1.9.25'
 	id 'org.jetbrains.kotlin.plugin.jpa' version '1.9.25'
-	id 'org.springframework.boot' version '3.4.3'
+	id 'org.springframework.boot' version '3.2.5'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.jetbrains.kotlin.plugin.allopen' version '1.9.25' // Dodane dla Hibernate
 	id 'org.jetbrains.kotlin.kapt' version '1.9.25' // Dodane dla mapstruct
@@ -19,15 +19,26 @@ java {
 
 repositories {
 	mavenCentral()
+	maven { url = uri("https://repo.spring.io/milestone") } // for release candidates
+	maven { url = uri("https://repo.spring.io/snapshot") }  // for snapshots if needed
 }
 
+dependencyManagement {
+	imports {
+		mavenBom("org.springframework.cloud:spring-cloud-dependencies:2023.0.0") // or latest
+	}
+}
 dependencies {
 	// Spring Boot
-	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server' // Wymagane dla JWT
+	implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+	implementation("org.springframework.cloud:spring-cloud-starter-loadbalancer")
+	implementation("org.springframework.boot:spring-boot-starter-webflux") // Required for Gateway
+
 
 	// AWS
 	implementation 'software.amazon.awssdk:cognitoidentityprovider:2.20.0'

@@ -9,9 +9,19 @@ import pl.edu.pwr.chat.dto.RegisterRequest
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient
 import software.amazon.awssdk.services.cognitoidentityprovider.model.*
 
-@Service class CognitoService( private val cognitoClient: CognitoIdentityProviderClient, @Value("\${aws.cognito.userPoolId}") private val userPoolId: String, @Value("\${aws.cognito.clientId}") private val clientId: String ) {
+@Service
+class CognitoService(
+    private val cognitoClient: CognitoIdentityProviderClient,
+    @Value("\${aws.cognito.userPoolId}") private val userPoolId: String,
+    @Value("\${aws.cognito.clientId}") private val clientId: String
+) {
+    init {
+        println("CognitoService User Pool ID: $userPoolId")
+        println("CognitoService Client ID: $clientId")
+    }
 
     fun registerUser(request: RegisterRequest) {
+        println("Registering user with userPoolId=$userPoolId and clientId=$clientId")
         val signUpRequest = SignUpRequest.builder()
             .clientId(clientId)
             .username(request.username)

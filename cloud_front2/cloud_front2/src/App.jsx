@@ -1,107 +1,151 @@
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import './App.css';
+import React, { useEffect, useRef, useState } from 'react';
 import { getApi } from './getApi';
-import { useAuth } from "react-oidc-context";
+import LoginForm from './LoginForm';
+import './App.css';
 
 function App() {
-  const auth = useAuth();
+  const [user, setUser] = useState(null); // Initialize user as null
+  const [token, setToken] = useState(null); // Initialize token as null
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [profilePictures, setProfilePictures] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
+  const [statuses, setStatuses] = useState({});
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [reactions, setReactions] = useState({});
   const fileInputRef = useRef(null);
-  const api = getApi();
+  const api = getApi(token);
 
-  const signOutRedirect = () => {
-    const clientId = import.meta.env.VITE_CLIENT_ID;
-    const logoutUri = import.meta.env.VITE_LOGOUT_URL;
-    const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN;
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+  const handleLogin = async (username, password) => {
+    try {
+      const loginApi = getApi(null); // no token yet
+      const data = await loginApi.login(username, password);
+      const token = data.accessToken;
+      if (!token) throw new Error('No access token received');
+
+      // Use this token to set status
+      await getApi(token).setStatus(username, "online");
+
+      // Now persist the state
+      setUser(username);
+      setToken(token);
+      localStorage.setItem('username', username);
+      localStorage.setItem('token', token);
+    } catch (error) {
+      console.error('Login failed', error);
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('username');
+      localStorage.removeItem('token');
+      alert('Login failed: Invalid username or password');
+    }
   };
 
+  const handleRegister = async (username, password, email) => {
+    try {
+      const registerApi = getApi(null);
+      const data = await registerApi.register(username, password, email);
+      const token = data.accessToken;
+      if (!token) throw new Error('No access token received');
 
-  if (auth.error) {
-    return <div>Encountering error... {auth.error.message}</div>;
-  }
-  useEffect(() => {
-    let interval;
-  
-    const startFetching = async () => {
-      await fetchMessages(); 
-  
-      interval = setInterval(() => {
-        fetchMessages(); 
-      }, 3000); 
-    };
-  
-    if (auth.isAuthenticated) {
-      startFetching();
+      await getApi(token).setStatus(username, "online");
+
+      setUser(username);
+      setToken(token);
+      localStorage.setItem('username', username);
+      localStorage.setItem('token', token);
+    } catch (error) {
+      console.error('Registration failed', error);
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('username');
+      localStorage.removeItem('token');
+      alert('Registration failed: Please try again');
     }
-  
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [auth.isAuthenticated]);
+  };
+
   useEffect(() => {
-    if (auth.isAuthenticated && messages.length > 0) {
-      loadProfilePictures();
+    if (user) {
+      fetchMessages();
+      fetchOnlineUsers();
+      const interval = setInterval(() => {
+        fetchMessages();
+        fetchOnlineUsers();
+      }, 5000);
+      return () => clearInterval(interval);
     }
-  }, [messages, auth.isAuthenticated]);
+  }, [user]);
 
-  const loadProfilePictures = async () => {
-    const uniqueUsernames = [...new Set(messages.map(msg => msg.username))];
-    const pictures = {};
-
-    for (const username of uniqueUsernames) {
-      if (!profilePictures[username]) {
-        try {
-          const pictureUrl = await api.getProfilePicture(username);
-          if (pictureUrl) {
-            pictures[username] = pictureUrl;
-          }
-        } catch (error) {
-          console.error(`Error loading profile picture for ${username}:`, error);
+  useEffect(() => {
+    const loadPicturesAndStatuses = async () => {
+      const usernames = [...new Set(messages.map(m => m.username))];
+      const statusMap = {};
+      const picMap = {};
+      for (const uname of usernames) {
+        if (!profilePictures[uname]) {
+          picMap[uname] = await api.getProfilePicture(uname);
         }
+        statusMap[uname] = await api.getStatus(uname);
       }
-    }
-
-    setProfilePictures(prev => ({ ...prev, ...pictures }));
-  };
+      setStatuses(statusMap);
+      setProfilePictures(prev => ({ ...prev, ...picMap }));
+    };
+    if (messages.length > 0) loadPicturesAndStatuses();
+  }, [messages]);
 
   const fetchMessages = async () => {
-    setLoading(true);
     try {
-      const response = await api.fetchChats(auth.user?.profile?.['cognito:username']);
-      if (response && typeof response === 'object' && Array.isArray(response.messages)) {
-        setMessages(response.messages);
-      } else {
-        console.error('API response is not in the expected format:', response);
-        setMessages([]);
+      const response = await api.fetchChats(user);
+      console.log('Fetch messages response:', response);
+      const messagesArray = Array.isArray(response.messages) ? response.messages : [];
+      setMessages(messagesArray);
+      const newReactions = {};
+      for (const msg of messagesArray) {
+        const r = await api.fetchReactions(msg.id);
+        newReactions[msg.id] = r;
       }
+      setReactions(newReactions);
     } catch (error) {
-      console.error('Error fetching messages:', error);
-    } finally {
-      setLoading(false);
+      console.error('Failed to fetch messages:', error);
+      setMessages([]);
+    }
+  };
+
+  const fetchOnlineUsers = async () => {
+    try {
+      const response = await api.getOnlineUsers();
+      console.log('Raw API response:', response);
+      
+      const users = 
+        Array.isArray(response) ? response :
+        Array.isArray(response?.users) ? response.users :
+        Array.isArray(response?.data?.users) ? response.data.users :
+        [];
+      
+      console.log('Processed users:', users);
+      setOnlineUsers(users);
+    } catch (error) {
+      console.error('Failed to fetch online users:', error);
+      setOnlineUsers([]);
     }
   };
 
   const handleSend = async () => {
     if (!messageInput.trim()) return;
-
-    try {
-      await api.sendMessage(messageInput, auth.user?.profile?.['cognito:username']);
-      setMessageInput('');
-      await fetchMessages();
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
+    await api.sendMessage(messageInput, user);
+    setMessageInput('');
+    await fetchMessages();
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleSend();
+  const handleReaction = async (msgId) => {
+    const reaction = prompt('Enter emoji:');
+    if (reaction) {
+      await api.react(msgId, reaction, user);
+      const updated = await api.fetchReactions(msgId);
+      setReactions(prev => ({
+        ...prev,
+        [msgId]: updated
+      }));
     }
   };
 
@@ -112,107 +156,81 @@ function App() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !auth.isAuthenticated) return;
-
-    try {
-      await api.uploadProfilePicture(
-        auth.user?.profile?.['cognito:username'],
-        selectedFile
-      );
-      // Refresh profile picture
-      const newUrl = await api.getProfilePicture(auth.user?.profile?.['cognito:username']);
-      setProfilePictures(prev => ({
-        ...prev,
-        [auth.user?.profile?.['cognito:username']]: newUrl
-      }));
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (error) {
-      console.error('Upload failed:', error);
-    }
+    if (!selectedFile) return;
+    await api.uploadProfilePicture(user, selectedFile);
+    const newUrl = await api.getProfilePicture(user);
+    setProfilePictures(prev => ({ ...prev, [user]: newUrl }));
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const handleLogout = async () => {
+    await api.setStatus(user, "offline");
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    setUser(null);
+    setToken(null);
+  };
+
+  if (!user) return <LoginForm onLogin={handleLogin} onRegister={handleRegister} />;
 
   return (
     <div className="app">
       <div className="chat-container">
-        {auth.isAuthenticated ? (
-          <>
-            <div className="header">
-              <div className="user-info">
-                {profilePictures[auth.user?.profile?.['cognito:username']] && (
-                  <img
-                    src={profilePictures[auth.user?.profile?.['cognito:username']]}
-                    alt="Profile"
-                    className="profile-pic"
-                  />
-                )}
-                <span>Welcome, {auth.user?.profile?.['cognito:username']}</span>
-              </div>
-              <button className="sign-out-btn" onClick={() => auth.removeUser()}>
-                Sign out
-              </button>
-            </div>
+        <div className="header">
+          <div className="user-info">
+            {profilePictures[user] && <img src={profilePictures[user]} className="profile-pic" alt="Profile" />}
+            <span>Welcome, {user}</span>
+          </div>
+          <button onClick={handleLogout}>Sign out</button>
+        </div>
 
-            <div className="messages-container">
-              {messages.map((message, index) => (
-                <div key={index} className="message">
-                  {profilePictures[message.username] && (
-                    <img
-                      src={profilePictures[message.username]}
-                      alt="Profile"
-                      className="profile-pic"
-                    />
-                  )}
+        <div className="main-content">
+          <div className="messages-container">
+            {messages.length > 0 ? (
+              messages.map((msg, i) => (
+                <div key={i} className="message">
+                  {profilePictures[msg.username] && <img src={profilePictures[msg.username]} className="profile-pic" alt="Profile" />}
                   <div className="message-content">
-                    <div className="message-sender">{message.username}</div>
-                    <div className="message-text">{message.message}</div>
+                    <div className="message-sender">{msg.username} ({statuses[msg.username] || 'Offline'})</div>
+                    <div className="message-text">{msg.message}</div>
+                    <div className="message-reactions">
+                      {reactions[msg.id] &&
+                        Object.entries(reactions[msg.id]).map(([emoji, data], j) => (
+                          <span key={j}>
+                            {emoji} ({data.count})
+                          </span>
+                        ))}
+                      <button onClick={() => handleReaction(msg.id)}>+</button>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="input-container">
-              <input
-                type="text"
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                disabled={loading}
-              />
-              <button onClick={handleSend} disabled={loading}>
-                {loading ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-
-            <div className="profile-upload">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-              />
-              <button
-                className="upload-btn"
-                onClick={() => fileInputRef.current.click()}
-              >
-                Choose Profile Picture
-              </button>
-              {selectedFile && (
-                <button className="upload-btn" onClick={handleUpload}>
-                  Upload
-                </button>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="header">
-            <span>Not logged in</span>
-            <button onClick={() => auth.signinRedirect()}>Sign in</button>
+              ))
+            ) : (
+              <p>No messages available</p>
+            )}
           </div>
-        )}
+
+          <div className="input-container">
+            <input value={messageInput} onChange={e => setMessageInput(e.target.value)} placeholder="Type a message..." />
+            <button onClick={handleSend}>Send</button>
+          </div>
+
+          <div className="profile-upload">
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" />
+            <button onClick={() => fileInputRef.current.click()}>Choose Picture</button>
+            {selectedFile && <button onClick={handleUpload}>Upload</button>}
+          </div>
+        </div>
+
+        <div className="online-users">
+          <h3>Online Users</h3>
+          {onlineUsers.length > 0 ? (
+            onlineUsers.map((u, i) => <div key={i}>{u}</div>)
+          ) : (
+            <div>No online users</div>
+          )}
+        </div>
       </div>
     </div>
   );

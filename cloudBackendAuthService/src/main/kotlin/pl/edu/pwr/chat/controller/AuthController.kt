@@ -9,7 +9,7 @@ import pl.edu.pwr.chat.dto.LoginRequest
 import pl.edu.pwr.chat.dto.RegisterRequest
 import pl.edu.pwr.chat.service.CognitoService
 
-@RestController @RequestMapping("/api/auth") class AuthController(private val cognitoService: CognitoService) {
+@RestController @RequestMapping("/auth") class AuthController(private val cognitoService: CognitoService) {
 
     @PostMapping("/register")
     fun register(@Valid @RequestBody request: RegisterRequest): ResponseEntity<String> {

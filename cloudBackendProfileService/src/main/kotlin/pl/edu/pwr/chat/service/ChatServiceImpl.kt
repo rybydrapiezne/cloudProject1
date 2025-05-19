@@ -27,7 +27,9 @@ class ChatServiceImpl @Autowired constructor(
     private val bucketName = System.getenv("bucket_name")
 
 
-
+init {
+    println("Bucket Name: $bucketName")
+}
 
     override fun getProfilePicture(username: String): ResponseEntity<Any> {
         return try {
